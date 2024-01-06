@@ -9,6 +9,7 @@ class BunjoNET
       tcp_all: false, udp_all: false,
       exclude_tcp: nil, exclude_udp: nil,
       script: nil, script_class: nil,
+      show_scripts: false, script_help: nil,
 
       script_args: {
         port: {
@@ -32,11 +33,7 @@ class BunjoNET
   end
 
   def banner
-<<<<<<< HEAD
     banner_text = <<-'BANNER'
-=======
-    banner_text =<<-'BANNER'
->>>>>>> ee102db2328132cb1dee92425f38ac3a2999d472
 --------------------------------------    
 .                    .   ..---..---.  
 |              o     |\  ||      |    
@@ -118,6 +115,10 @@ class BunjoNET
           end
         end
 
+        params.on "--show-scripts", "Print all scripts" do |show_scripts|
+          @parameters[:show_scripts] = true
+        end
+
         params.on "--tcp TCP_PORTS", "-tcp TCP_PORTS", String, "Define tcp ports to scan" do |tcp_ports|
           if tcp_ports.downcase.include? "all"
             @parameters[:tcp_ports] = 1..65535
@@ -195,6 +196,52 @@ class BunjoNET
 
     valid_negative
     valid_range
+  end
+
+  def print_scripts
+    scripts_text = -<<'SCRPITS_TEXT'
+SCRIPTS
+
+  AUTH
+    - anon-ftp
+    - http-auth
+  
+  BRUTE
+    - ftp-brute
+    - mysql-brute
+    - pop3-brute
+    - smb-brute
+    - snmp-brute
+    - ssh-brute
+    - telnet-brute
+    - vnc-brute
+  
+  DISCOVER
+    - dns-records
+    - file-scan
+    - http-headers
+    
+  VULN
+    - proftpd-backdoor
+    - vsftpd-backdoor
+ 
+   DOS
+    - http-slowloris
+    - smb-flood
+  
+  ENUM
+    - ftp-user-enum
+    - mysql-user-enum
+    - smb-user-enum
+    - snmp-user-enum
+
+  INFO
+    - banner
+    - whois
+    
+SCRPITS_TEXT
+
+    $stdout.puts scripts_text.colorize :light_white
   end
 
   def print_help
@@ -306,7 +353,7 @@ HELP STAGE
   def import_script_engine
     @script_engine_file = File.join $current_directory, 'source', 'scripts', 'script_engine.rb'
     require @script_engine_file
-    @script_engine = ScriptEngine.new @parameters[:host], "", ""
+    @script_engine = ScriptEngine.new @parameters[:host], ""
   end
 
   def import_all_classes
@@ -322,7 +369,10 @@ HELP STAGE
     when @parameters[:help]
       print_help
       exit 0
-    when @parameters[:tcp_ports] && @parameters[:udp_ports] && @parameters[:script]
+
+    when @parameters[:show_scripts]
+      print_scripts
+      exit 0
 
     when @parameters[:tcp_ports] && @parameters[:udp_ports]
       import_scanner_tcp
@@ -351,14 +401,27 @@ HELP STAGE
 
     when @parameters[:tcp_ports]
       begin
-<<<<<<< HEAD
 
         case @parameters[:tcp_ports]
 
         when @parameters[:banner]
 
         when @parameters[:script]
+          import_scanner_tcp
+          import_script_engine
 
+          tcp_threads = []
+          only_tcp_time = Time.now
+
+          $stdout.puts "PORT STATUS".colorize :light_white
+
+          @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
+            tcp_threads << Thread.new { @tcp_scanner.tcp_scan tcp_port }
+          end
+
+          tcp_threads.each &:join
+
+          $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}".colorize :light_white
         else
           import_scanner_tcp
 
@@ -376,23 +439,6 @@ HELP STAGE
           $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}".colorize :light_white
         end
 
-=======
-        import_scanner
-
-        tcp_threads = []
-        only_tcp_time = Time.now
-
-        $stdout.puts "PORT STATUS".colorize :light_white
-
-        @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
-          tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
-        end
-
-        tcp_threads.each &:join
-
-        $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}"
-                       .colorize :light_white
->>>>>>> ee102db2328132cb1dee92425f38ac3a2999d472
       rescue Interrupt
         $stderr.puts "Program closed by user.".colorize :red
       end
