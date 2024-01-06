@@ -8,11 +8,21 @@ class BunjoNET
       timeout: 1, threads: 5,
       tcp_all: false, udp_all: false,
       exclude_tcp: nil, exclude_udp: nil,
-      script: nil,  script_class: nil,
+      script: nil, script_class: nil,
 
       script_args: {
+        port: {
+          ftp: 21,
+          ssh: 22,
+          telnet: 23,
+          http: 80,
+          https: 443,
+        },
+
+        use_ssl: false,
         host: nil,
-        port: nil,
+        user_list: nil,
+        wordlist: nil,
       }
     }
 
@@ -21,11 +31,32 @@ class BunjoNET
     $current_directory = File.expand_path File.dirname __FILE__
   end
 
+  def banner
+    banner_text = <<-'BANNER'
+--------------------------------------    
+.                    .   ..---..---.  
+|              o     |\  ||      |    
+|.-. .  . .--. . .-. | \ ||---   |    
+|   )|  | |  | |(   )|  \||      |    
+'`-' `--`-'  `-| `-' '   ''---'  '    
+               ;                      
+            `-'                       
+--------------------------------------
+    BANNER
+
+    $stdout.puts banner_text.colorize :red
+  end
+
   def parse_options
     begin
       OptionParser.new do |params|
         params.on "--host HOST", String, "Define the target host" do |host|
-          @parameters[:host] = host
+          if host.start_with? "https://" or host.start_with? "http://"
+            $stderr.puts "Error: Please enter a valid host.".colorize :red
+            exit 1
+          else
+            @parameters[:host] = host
+          end
         end
 
         params.on "--threads THREADS", Integer, "Enter threads to parallel scan (default: 5)" do |threads|
@@ -199,8 +230,8 @@ HELP STAGE
       --output FILE: Enter file to save output 
 
     EXAMPLES
-      bnjmap --host example.com --tcp 21,80,3306 --udp 53
-      bnjmap --host example.com --tcp 80,3306 --timeout 0.5
+      bunjoNET --host example.com --tcp 21,80,3306 --udp 53
+      bunjoNET --host example.com --tcp 80,3306 --timeout 0.5
     
     HELP_TEXT
 
@@ -219,6 +250,7 @@ HELP STAGE
     end
 
     unless @parameters[:host].nil?
+      banner
       $stdout.puts "SCAN INFORMATIONS".colorize :light_white
       display_parameter :host, "Target Host"
       $stdout.puts
@@ -230,17 +262,17 @@ HELP STAGE
           colorize :light_cyan unless @parameters[:exclude_tcp].nil?
       else
         $stdout.puts "Exclude TCP: #{@parameters[:exclude_tcp].join(",")}\n"
-          .colorize :light_cyan unless @parameters[:exclude_tcp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_tcp].nil?
       end
 
       display_parameter :udp_ports, "UDP Ports"
 
       if @exclude_udp_range_used
         $stdout.puts "Exclude UDP: #{@exclude_range_udp[0]..@exclude_range_udp[1]}"
-          .colorize :light_cyan unless @parameters[:exclude_udp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
       else
         $stdout.puts "Exclude UDP: #{@parameters[:exclude_udp].join(",")}\n"
-          .colorize :light_cyan unless @parameters[:exclude_udp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
       end
 
       puts
@@ -249,14 +281,20 @@ HELP STAGE
     end
   end
 
-  def import_scanner
-    @scanner_file = File.join $current_directory, 'source', 'scanner.rb'
-    require @scanner_file
-    @scanner = BunjoScan.new @parameters[:host], @parameters[:timeout]
+  def import_scanner_tcp
+    @tcp_scanner_file = File.join $current_directory, 'utils', 'tcp_scanner', 'tcp_scan.rb'
+    require @tcp_scanner_file
+    @tcp_scanner = BunjoScanTCP.new @parameters[:host], @parameters[:timeout]
+  end
+
+  def import_scanner_udp
+    @udp_scanner_file = File.join $current_directory, 'utils', 'udp_scanner', 'udp_scan.rb'
+    require @udp_scanner_file
+    @udp_scanner = BunjoScanUDP.new @parameters[:host], @parameters[:timeout]
   end
 
   def import_version_scanner
-    @version_detecter_file = File.join $current_directory, 'source', 'version_detecter.rb'
+    @version_detecter_file = File.join $current_directory, 'utils', 'version_detect', 'version_detecter.rb'
     require @version_detecter_file
     @version_detecter = BunjoVersionDetect.new @parameters[:host]
   end
@@ -268,7 +306,8 @@ HELP STAGE
   end
 
   def import_all_classes
-    import_scanner
+    import_scanner_tcp
+    import_scanner_udp
     import_version_scanner
     import_script_engine
   end
@@ -281,12 +320,9 @@ HELP STAGE
       exit 0
     when @parameters[:tcp_ports] && @parameters[:udp_ports] && @parameters[:script]
 
-    when @parameters[:tcp_ports] && @parameters[:script]
-
-    when @parameters[:udp_ports] && @parameters[:script]
-
     when @parameters[:tcp_ports] && @parameters[:udp_ports]
-      import_scanner
+      import_scanner_tcp
+      import_scanner_udp
 
       tcp_threads = []
       udp_threads = []
@@ -297,11 +333,11 @@ HELP STAGE
       $stdout.puts "PORT STATUS".colorize :light_white
 
       @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
-        tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
+        tcp_threads << Thread.new { @tcp_scanner.tcp_scan tcp_port }
       end
 
       @parameters[:udp_ports].reject { |port| @parameters[:exclude_udp]&.include? port.to_i }.each do |udp_port|
-        udp_threads << Thread.new { @scanner.udp_scan udp_port }
+        udp_threads << Thread.new { @udp_scanner.udp_scan udp_port }
       end
 
       tcp_threads.each &:join
@@ -310,23 +346,36 @@ HELP STAGE
       $stdout.puts "\nTHE PASSING TIME (with timeout):\nTCP: #{Time.now - only_tcp_time}\nUDP: #{Time.now - only_udp_time}".colorize :light_white
 
     when @parameters[:tcp_ports]
-      import_scanner
+      begin
 
-      tcp_threads = []
-      only_tcp_time = Time.now
+        case @parameters[:tcp_ports]
 
-      $stdout.puts "PORT STATUS".colorize :light_white
+        when @parameters[:banner]
 
-      @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
-        tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
+        when @parameters[:script]
+
+        else
+          import_scanner_tcp
+
+          tcp_threads = []
+          only_tcp_time = Time.now
+
+          $stdout.puts "PORT STATUS".colorize :light_white
+
+          @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
+            tcp_threads << Thread.new { @tcp_scanner.tcp_scan tcp_port }
+          end
+
+          tcp_threads.each &:join
+
+          $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}".colorize :light_white
+        end
+
+      rescue Interrupt
+        $stderr.puts "Program closed by user.".colorize :red
       end
-
-      tcp_threads.each &:join
-
-      $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}"
-        .colorize :light_white
     when @parameters[:udp_ports]
-      import_scanner
+      import_scanner_udp
 
       udp_threads = []
       only_udp_time = Time.now
@@ -334,7 +383,7 @@ HELP STAGE
       $stdout.puts "PORT STATUS".colorize :light_white
 
       @parameters[:udp_ports].reject { |port| @parameters[:exclude_udp]&.include? port.to_i }.each do |udp_port|
-        udp_threads << Thread.new { @scanner.udp_scan udp_port }
+        udp_threads << Thread.new { @tcp_scanner.udp_scan udp_port }
       end
 
       udp_threads.each &:join
