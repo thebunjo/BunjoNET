@@ -11,8 +11,18 @@ class BunjoNET
       script: nil,  script_class: nil,
 
       script_args: {
+        port: {
+          ftp: 21,
+          ssh: 22,
+          telnet: 23,
+          http: 80,
+          https: 443,
+        },
+
+        use_ssl: false,
         host: nil,
-        port: nil,
+        user_list: nil,
+        wordlist: nil,
       }
     }
 
@@ -41,7 +51,12 @@ class BunjoNET
     begin
       OptionParser.new do |params|
         params.on "--host HOST", String, "Define the target host" do |host|
-          @parameters[:host] = host
+          if host.start_with? "https://" or host.start_with? "http://"
+            $stderr.puts "Error: Please enter a valid host.".colorize :red
+            exit 1
+          else
+            @parameters[:host] = host
+          end
         end
 
         params.on "--threads THREADS", Integer, "Enter threads to parallel scan (default: 5)" do |threads|
