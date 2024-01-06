@@ -355,6 +355,15 @@ HELP STAGE
     @script_engine = ScriptEngine.new @parameters[:host]
   end
 
+  def perform_script_scans port
+    import_script_engine
+
+    @parameters[:script].each do |script|
+      @script_engine.control_script script, port
+    end
+
+  end
+
   def perform_tcp_scan
     import_scanner_tcp
 
