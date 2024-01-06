@@ -21,6 +21,22 @@ class BunjoNET
     $current_directory = File.expand_path File.dirname __FILE__
   end
 
+  def banner
+    banner_text =<<-'BANNER'
+--------------------------------------    
+.                    .   ..---..---.  
+|              o     |\  ||      |    
+|.-. .  . .--. . .-. | \ ||---   |    
+|   )|  | |  | |(   )|  \||      |    
+'`-' `--`-'  `-| `-' '   ''---'  '    
+               ;                      
+            `-'                       
+--------------------------------------
+    BANNER
+
+    $stdout.puts banner_text.colorize :red
+  end
+
   def parse_options
     begin
       OptionParser.new do |params|
@@ -219,6 +235,7 @@ HELP STAGE
     end
 
     unless @parameters[:host].nil?
+      banner
       $stdout.puts "SCAN INFORMATIONS".colorize :light_white
       display_parameter :host, "Target Host"
       $stdout.puts
@@ -230,17 +247,17 @@ HELP STAGE
           colorize :light_cyan unless @parameters[:exclude_tcp].nil?
       else
         $stdout.puts "Exclude TCP: #{@parameters[:exclude_tcp].join(",")}\n"
-          .colorize :light_cyan unless @parameters[:exclude_tcp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_tcp].nil?
       end
 
       display_parameter :udp_ports, "UDP Ports"
 
       if @exclude_udp_range_used
         $stdout.puts "Exclude UDP: #{@exclude_range_udp[0]..@exclude_range_udp[1]}"
-          .colorize :light_cyan unless @parameters[:exclude_udp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
       else
         $stdout.puts "Exclude UDP: #{@parameters[:exclude_udp].join(",")}\n"
-          .colorize :light_cyan unless @parameters[:exclude_udp].nil?
+                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
       end
 
       puts
@@ -310,21 +327,25 @@ HELP STAGE
       $stdout.puts "\nTHE PASSING TIME (with timeout):\nTCP: #{Time.now - only_tcp_time}\nUDP: #{Time.now - only_udp_time}".colorize :light_white
 
     when @parameters[:tcp_ports]
-      import_scanner
+      begin
+        import_scanner
 
-      tcp_threads = []
-      only_tcp_time = Time.now
+        tcp_threads = []
+        only_tcp_time = Time.now
 
-      $stdout.puts "PORT STATUS".colorize :light_white
+        $stdout.puts "PORT STATUS".colorize :light_white
 
-      @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
-        tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
+        @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
+          tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
+        end
+
+        tcp_threads.each &:join
+
+        $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}"
+                       .colorize :light_white
+      rescue Interrupt
+        $stderr.puts "Program closed by user.".colorize :red
       end
-
-      tcp_threads.each &:join
-
-      $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}"
-        .colorize :light_white
     when @parameters[:udp_ports]
       import_scanner
 
