@@ -32,7 +32,11 @@ class BunjoNET
   end
 
   def banner
+<<<<<<< HEAD
     banner_text = <<-'BANNER'
+=======
+    banner_text =<<-'BANNER'
+>>>>>>> ee102db2328132cb1dee92425f38ac3a2999d472
 --------------------------------------    
 .                    .   ..---..---.  
 |              o     |\  ||      |    
@@ -347,6 +351,7 @@ HELP STAGE
 
     when @parameters[:tcp_ports]
       begin
+<<<<<<< HEAD
 
         case @parameters[:tcp_ports]
 
@@ -371,6 +376,23 @@ HELP STAGE
           $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}".colorize :light_white
         end
 
+=======
+        import_scanner
+
+        tcp_threads = []
+        only_tcp_time = Time.now
+
+        $stdout.puts "PORT STATUS".colorize :light_white
+
+        @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
+          tcp_threads << Thread.new { @scanner.tcp_scan tcp_port }
+        end
+
+        tcp_threads.each &:join
+
+        $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - only_tcp_time}"
+                       .colorize :light_white
+>>>>>>> ee102db2328132cb1dee92425f38ac3a2999d472
       rescue Interrupt
         $stderr.puts "Program closed by user.".colorize :red
       end
