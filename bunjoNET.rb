@@ -103,7 +103,7 @@ Github: https://github.com/thebunjo/BunjoNET
             @exclude_range_tcp = exclude_tcp.split "-"
             @exclude_tcp_range_used = true
             if @exclude_range_tcp[0].to_i < @exclude_range_tcp[1].to_i
-              @parameters[:exclude_tcp] = (@exclude_range_tcp[0].to_i..@exclude_range_tcp[1].to_i).to_a
+              @parameters[:exclude_tcp] = (@exclude_range_tcp[0].to_i..@exclude_range_tcp[1].to_i)
             elsif @exclude_range_tcp[0].to_i == @exclude_range_tcp[1].to_i
               @parameters[:exclude_tcp] = [@exclude_range_tcp[0].to_i]
             end
@@ -119,7 +119,7 @@ Github: https://github.com/thebunjo/BunjoNET
             @exclude_range_udp = exclude_udp.split "-"
             @exclude_udp_range_used = true
             if @exclude_range_udp[0].to_i < @exclude_range_udp[1].to_i
-              @parameters[:exclude_udp] = (@exclude_range_udp[0].to_i..@exclude_range_udp[1].to_i).to_a
+              @parameters[:exclude_udp] = (@exclude_range_udp[0].to_i..@exclude_range_udp[1].to_i)
             elsif @exclude_range_udp[0].to_i == @exclude_range_udp[1].to_i
               @parameters[:exclude_udp] = [@exclude_range_udp[0].to_i]
             end
@@ -314,22 +314,44 @@ HELP STAGE
     $stdout.puts "|".colorize :light_white
     $stdout.puts "| Host: #{@parameters[:host]}".colorize :light_white
     $stdout.puts "|".colorize :light_white
-    $stdout.puts "| Ports:".colorize :light_white
-    if @parameters[:tcp_ports].is_a?(Array)
-      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports].join(", ")}".colorize :light_white
-    elsif @parameters[:tcp_ports].is_a?(Range)
-      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports]}"
-                     .colorize :light_white
-    else
-      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports]}".colorize :light_white
-    end
-    $stdout.puts "|\tExclude TCP: #{@parameters[:exclude_tcp].join(", ")}"
-                   .colorize :light_white unless @parameters[:exclude_tcp].nil?
+
+    $stdout.puts "| Timeout: #{@parameters[:timeout]}".colorize :light_white
     $stdout.puts "|".colorize :light_white
-    $stdout.puts "|\tUDP: #{@parameters[:udp_ports].join(", ")}"
-                   .colorize :light_white
-    $stdout.puts "|\tExclude UDP: #{@parameters[:exclude_udp].join(", ")}"
-                   .colorize :light_white unless @parameters[:exclude_udp].nil?
+
+    $stdout.puts "| Ports:".colorize :light_white
+
+    if @parameters[:tcp_ports].is_a? Array
+      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports].join(", ")}".colorize :light_white
+    elsif @parameters[:tcp_ports].is_a? Range
+      $stdout.puts "|\tTCP Range: #{@parameters[:tcp_ports]}"
+                     .colorize :light_white
+    end
+
+    if @parameters[:exclude_tcp].is_a? Array
+      $stdout.puts "|\tExclude TCP: #{@parameters[:exclude_tcp].join(", ")}"
+                     .colorize :light_white unless @parameters[:exclude_tcp].nil?
+    elsif @parameters[:exclude_tcp].is_a? Range
+      $stdout.puts "|\tExclude TCP Range: #{@parameters[:exclude_tcp]}"
+                     .colorize :light_white unless @parameters[:exclude_tcp].nil?
+    end
+
+    $stdout.puts "|".colorize :light_white
+
+    if @parameters[:udp_ports].is_a? Array
+      $stdout.puts "|\tUDP: #{@parameters[:udp_ports].join(", ")}".colorize :light_white
+    elsif @parameters[:udp_ports].is_a? Range
+      $stdout.puts "|\tUDP Range: #{@parameters[:udp_ports]}"
+                     .colorize :light_white
+    end
+
+    if @parameters[:exclude_udp].is_a? Array
+      $stdout.puts "|\tExclude UDP: #{@parameters[:exclude_udp].join(", ")}"
+                     .colorize :light_white unless @parameters[:exclude_udp].nil?
+    elsif @parameters[:exclude_udp].is_a? Range
+      $stdout.puts "|\tExclude UDP Range: #{@parameters[:exclude_udp]}"
+                     .colorize :light_white unless @parameters[:exclude_udp].nil?
+    end
+
     $stdout.puts "|".colorize :light_white
   end
 
@@ -419,6 +441,7 @@ HELP STAGE
           perform_tcp_scan
           perform_udp_scan
 
+          $stdout.puts "|".colorize :light_white
           $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
         when @parameters[:tcp_ports]
           case
@@ -431,6 +454,7 @@ HELP STAGE
             perform_tcp_scan
             perform_script_scans
 
+            $stdout.puts "|".colorize :light_white
             $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
           else
             $stdout.puts "| PORT STATUS".colorize :light_white
@@ -439,6 +463,7 @@ HELP STAGE
 
             perform_tcp_scan
 
+            $stdout.puts "|".colorize :light_white
             $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
           end
         when @parameters[:udp_ports]
@@ -448,6 +473,7 @@ HELP STAGE
 
           perform_udp_scan
 
+          $stdout.puts "|".colorize :light_white
           $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
         when @parameters[:host].nil? && @parameters[:tcp_ports].nil? && @parameters[:udp_ports].nil?
           print_help
