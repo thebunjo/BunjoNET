@@ -27,6 +27,17 @@ class BunjoNET
       }
     }
 
+    @scripts = %w[
+    anon-ftp http-auth ftp-brute mysql-brute
+    pop3-brute smb-brute snmp-brute ssh-brute
+    telnet-brute vnc-brute dns-records file-scan
+    http-headers http-slowloris smb-flood ftp-user-enum
+    mysql-user-enum smtp-user-enum banner whois
+    proftpd-backdoor vsftpd-backdoor
+]
+
+    @used_scripts = []
+
     parse_options
 
     $current_directory = File.expand_path File.dirname __FILE__
@@ -37,15 +48,18 @@ class BunjoNET
 --------------------------------------    
 .                    .   ..---..---.  
 |              o     |\  ||      |    
-|.-. .  . .--. . .-. | \ ||---   |    
-|   )|  | |  | |(   )|  \||      |    
+|.-. .  . .--. . .-. | \ ||---   |     
+|   )|  | |  | |(   )|  \||      |      
 '`-' `--`-'  `-| `-' '   ''---'  '    
                ;                      
-            `-'                       
+            `-'     
+--------------------------------------     
+Developed By Bunjo
+Github: https://github.com/thebunjo/BunjoNET
 --------------------------------------
     BANNER
 
-    $stdout.puts banner_text.colorize :red
+    $stdout.puts banner_text.colorize :magenta
   end
 
   def parse_options
@@ -65,11 +79,18 @@ class BunjoNET
         end
 
         params.on "--script SCRIPT", String, "Select scripts to use" do |script|
-          @script_used = true
           if script.include? ","
-            @parameters[:script] = script.split ","
+            scripts = script.split ","
+            scripts.each do |script_control|
+              if @scripts.include? script_control
+                @used_scripts.append script_control
+              end
+            end
           else
-            @parameters[:script] = [script]
+            if @scripts.include? script
+              @parameters[:script] = [script]
+              @used_scripts.append script
+            end
           end
         end
 
@@ -87,7 +108,7 @@ class BunjoNET
               @parameters[:exclude_tcp] = [@exclude_range_tcp[0].to_i]
             end
           elsif exclude_tcp.include? ","
-            @parameters[:exclude_tcp] = exclude_tcp.split(",").map(&:to_i)
+            @parameters[:exclude_tcp] = exclude_tcp.split ",".map &:to_i
           else
             @parameters[:exclude_tcp] = [exclude_tcp.to_i]
           end
@@ -98,14 +119,14 @@ class BunjoNET
             @exclude_range_udp = exclude_udp.split "-"
             @exclude_udp_range_used = true
             if @exclude_range_udp[0].to_i < @exclude_range_udp[1].to_i
-              @parameters[:exclude_udp] = @exclude_range_udp[0]..@exclude_range_udp[1]
+              @parameters[:exclude_udp] = (@exclude_range_udp[0].to_i..@exclude_range_udp[1].to_i).to_a
             elsif @exclude_range_udp[0].to_i == @exclude_range_udp[1].to_i
               @parameters[:exclude_udp] = [@exclude_range_udp[0].to_i]
             end
           elsif exclude_udp.include? ","
-            @parameters[:exclude_udp] = exclude_udp.split ","
+            @parameters[:exclude_udp] = exclude_udp.split ",".map &:to_i
           else
-            @parameters[:exclude_udp] = exclude_udp.to_i
+            @parameters[:exclude_udp] = [exclude_udp.to_i]
           end
         end
 
@@ -286,49 +307,30 @@ HELP STAGE
     $stdout.puts help_text.colorize :light_white
   end
 
-  def display_parameters
-    def display_parameter key, label
-      if @parameters[key].is_a? Array
-        $stdout.puts "#{label}: #{@parameters[key].join ', '}"
-                       .colorize :light_cyan if @parameters[key].any?
-      else
-        $stdout.puts "#{label}: #{@parameters[key]}"
-                       .colorize :light_cyan if @parameters[key]
-      end
+  def display
+    banner
+
+    $stdout.puts "| SCAN INFORMATION".colorize :light_white
+    $stdout.puts "|".colorize :light_white
+    $stdout.puts "| Host: #{@parameters[:host]}".colorize :light_white
+    $stdout.puts "|".colorize :light_white
+    $stdout.puts "| Ports:".colorize :light_white
+    if @parameters[:tcp_ports].is_a?(Array)
+      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports].join(", ")}".colorize :light_white
+    elsif @parameters[:tcp_ports].is_a?(Range)
+      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports]}"
+                     .colorize :light_white
+    else
+      $stdout.puts "|\tTCP: #{@parameters[:tcp_ports]}".colorize :light_white
     end
-
-    unless @parameters[:host].nil?
-      banner
-      $stdout.puts "SCAN INFORMATIONS".colorize :light_white
-      display_parameter :host, "Target Host"
-
-      display_parameter :tcp_ports, "TCP Ports"
-
-      if @exclude_tcp_range_used
-        $stdout.puts "Exclude TCP: #{@exclude_range_tcp[0]..@exclude_range_tcp[1]}".
-          colorize :light_cyan unless @parameters[:exclude_tcp].nil?
-      else
-        $stdout.puts "Exclude TCP: #{@parameters[:exclude_tcp].join(",")}\n"
-                       .colorize :light_cyan unless @parameters[:exclude_tcp].nil?
-      end
-
-      display_parameter :udp_ports, "UDP Ports"
-
-      if @exclude_udp_range_used
-        $stdout.puts "Exclude UDP: #{@exclude_range_udp[0]..@exclude_range_udp[1]}"
-                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
-      else
-        $stdout.puts "Exclude UDP: #{@parameters[:exclude_udp].join ","}\n"
-                       .colorize :light_cyan unless @parameters[:exclude_udp].nil?
-      end
-
-      display_parameter :timeout, "Timeout"
-
-      if @script_used
-        $stdout.puts "Script: #{@parameters[:script].join ","}\n"
-                       .colorize :light_cyan unless @parameters[:script].nil?
-      end
-    end
+    $stdout.puts "|\tExclude TCP: #{@parameters[:exclude_tcp].join(", ")}"
+                   .colorize :light_white unless @parameters[:exclude_tcp].nil?
+    $stdout.puts "|".colorize :light_white
+    $stdout.puts "|\tUDP: #{@parameters[:udp_ports].join(", ")}"
+                   .colorize :light_white
+    $stdout.puts "|\tExclude UDP: #{@parameters[:exclude_udp].join(", ")}"
+                   .colorize :light_white unless @parameters[:exclude_udp].nil?
+    $stdout.puts "|".colorize :light_white
   end
 
   def import_scanner_tcp
@@ -355,108 +357,109 @@ HELP STAGE
     @script_engine = ScriptEngine.new @parameters[:host]
   end
 
-  def perform_script_scans port
+  def perform_script_scans
     import_script_engine
 
     @parameters[:script].each do |script|
-      @script_engine.control_script script, port
-    end
-
-  end
-
-  def perform_tcp_scan
-    import_scanner_tcp
-
-    tcp_threads = []
-
-    @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
-      tcp_threads << Thread.new { @tcp_scanner.tcp_scan tcp_port }
-    end
-
-    tcp_threads.each &:join
-  end
-
-  def perform_udp_scan
-    import_scanner_udp
-
-    udp_threads = []
-
-    @parameters[:udp_ports].reject { |port| @parameters[:exclude_udp]&.include? port.to_i }.each do |udp_port|
-      udp_threads << Thread.new { @udp_scanner.udp_scan udp_port }
-    end
-
-    udp_threads.each &:join
-  end
-
-  def import_all_classes
-    import_scanner_tcp
-    import_scanner_udp
-    import_version_scanner
-    import_script_engine
-  end
-
-  def start
-    begin
-
-      case
-
-      when @parameters[:help]
-        print_help
-        exit 0
-
-      when @parameters[:show_scripts]
-        print_scripts
-        exit 0
-
-      when @parameters[:tcp_ports] && @parameters[:udp_ports]
-        $stdout.puts "PORT STATUS".colorize :light_white
-
-        time_now = Time.now
-
-        perform_tcp_scan
-        perform_udp_scan
-
-        $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
-      when @parameters[:tcp_ports]
-        case
-
-        when @parameters[:script]
-          $stdout.puts "PORT STATUS".colorize :light_white
-
-          time_now = Time.now
-
-          import_script_engine
-          perform_tcp_scan
-
-          $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
-        else
-          $stdout.puts "PORT STATUS".colorize :light_white
-
-          time_now = Time.now
-
-          perform_tcp_scan
-
-          $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
-        end
-      when @parameters[:udp_ports]
-        $stdout.puts "PORT STATUS".colorize :light_white
-
-        time_now = Time.now
-
-        perform_udp_scan
-
-        $stdout.puts "\nTHE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
-      when @parameters[:host].nil? && @parameters[:tcp_ports].nil? && @parameters[:udp_ports].nil?
-        print_help
-      else
-        print_help
+      if @scripts.include? script
+        @script_engine.control_script script
       end
     end
-  rescue Interrupt
-    $stderr.puts "Program closed by user.".colorize :red
   end
-end
 
-port_scanner = BunjoNET.new
-port_scanner.display_parameters
-port_scanner.start
+    def perform_tcp_scan
+      import_scanner_tcp
+
+      tcp_threads = []
+
+      @parameters[:tcp_ports].reject { |port| @parameters[:exclude_tcp]&.include? port.to_i }.each do |tcp_port|
+        tcp_threads << Thread.new { @tcp_scanner.tcp_scan tcp_port }
+      end
+
+      tcp_threads.each &:join
+    end
+
+    def perform_udp_scan
+      import_scanner_udp
+
+      udp_threads = []
+
+      @parameters[:udp_ports].reject { |port| @parameters[:exclude_udp]&.include? port.to_i }.each do |udp_port|
+        udp_threads << Thread.new { @udp_scanner.udp_scan udp_port }
+      end
+
+      udp_threads.each &:join
+    end
+
+    def import_all_classes
+      import_scanner_tcp
+      import_scanner_udp
+      import_version_scanner
+      import_script_engine
+    end
+
+    def start
+      begin
+
+        case
+
+        when @parameters[:help]
+          print_help
+          exit 0
+
+        when @parameters[:show_scripts]
+          print_scripts
+          exit 0
+
+        when @parameters[:tcp_ports] && @parameters[:udp_ports]
+          $stdout.puts "| PORT STATUS".colorize :light_white
+
+          time_now = Time.now
+
+          perform_tcp_scan
+          perform_udp_scan
+
+          $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
+        when @parameters[:tcp_ports]
+          case
+
+          when @parameters[:script]
+            $stdout.puts "PORT STATUS".colorize :light_white
+
+            time_now = Time.now
+
+            perform_tcp_scan
+            perform_script_scans
+
+            $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
+          else
+            $stdout.puts "| PORT STATUS".colorize :light_white
+
+            time_now = Time.now
+
+            perform_tcp_scan
+
+            $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
+          end
+        when @parameters[:udp_ports]
+          $stdout.puts "| PORT STATUS".colorize :light_white
+
+          time_now = Time.now
+
+          perform_udp_scan
+
+          $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
+        when @parameters[:host].nil? && @parameters[:tcp_ports].nil? && @parameters[:udp_ports].nil?
+          print_help
+        else
+          print_help
+        end
+      end
+    rescue Interrupt
+      $stderr.puts "Program closed by user.".colorize :red
+    end
+  end
+
+  port_scanner = BunjoNET.new
+  port_scanner.display
+  port_scanner.start
