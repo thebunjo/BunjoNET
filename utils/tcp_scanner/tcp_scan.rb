@@ -1,4 +1,5 @@
 require 'socket'
+require 'colorize'
 
 class BunjoScanTCP
   def initialize host, timeout
@@ -25,6 +26,8 @@ class BunjoScanTCP
       retry
     rescue Errno::EISCONN
       $stdout.puts "#{tcp_port}/tcp open".colorize :green
+    rescue Errno::ENOTCONN
+      # Ignored
     rescue Errno::ECONNREFUSED
       # Ignored
     rescue Errno::ETIMEDOUT
@@ -34,6 +37,34 @@ class BunjoScanTCP
     rescue Errno::ENETUNREACH
       # Ignored
     rescue Errno::EINVAL
+      # Ignored
+    rescue Errno::EADDRNOTAVAIL
+      # Ignored
+    rescue  Errno::EFAULT
+      # Ignored
+    rescue Errno::EBADF
+      # Ignored
+    rescue Errno::ELOOP
+      # Ignored
+    rescue Errno::ENAMETOOLONG
+      # Ignored
+    rescue Errno::ETOOMANYREFS
+      # Ignored
+    rescue Errno::ESOCKTNOSUPPORT
+      # Ignored
+    rescue Errno::EOPNOTSUPP
+      # Ignored
+    rescue Errno::ENOTDIR
+      # Ignored
+    rescue Errno::ENOMEM
+      # Ignored
+    rescue Errno::ENOBUFS
+      # Ignored
+    rescue Errno::EPROTOTYPE
+      # Ignored
+    rescue Errno::EPROTONOSUPPORT
+      # Ignored
+    rescue Errno::EALREADY
       # Ignored
     rescue Exception
       # Ignored
