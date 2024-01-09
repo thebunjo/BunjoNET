@@ -4,12 +4,10 @@ class BunjoNET
     require 'colorize'
 
     @parameters = {
-      help: false, host: nil,
-      timeout: 1, threads: 5,
-      tcp_all: false, udp_all: false,
-      exclude_tcp: nil, exclude_udp: nil,
-      script: nil, script_class: nil,
-      show_scripts: false, script_help: nil,
+      help: false, host: nil, show_tcp_close: false, show_udp_close: false,
+      timeout: 1, threads: 5, show_scripts: false, script_help: nil,
+      tcp_all: false, udp_all: false, script: nil, script_class: nil,
+      exclude_tcp: nil, exclude_udp: nil, show_reason: false,
 
       script_args: {
         port: {
@@ -18,12 +16,10 @@ class BunjoNET
           telnet: 23,
           http: 80,
           https: 443,
-        },
+      },
 
-        use_ssl: false,
-        host: nil,
-        user_list: nil,
-        wordlist: nil,
+        use_ssl: false, user_list: nil,
+        wordlist: nil, host: nil,
       }
     }
 
@@ -78,20 +74,35 @@ Github: https://github.com/thebunjo/BunjoNET
           @parameters[:threads] = threads
         end
 
+        params.on "--show-tcp-close", String, "Add closed ports output to output." do
+          @parameters[:show_tcp_close] = true
+        end
+
+        params.on "--show-udp-close", String, "Add closed ports output to output." do
+          @parameters[:show_udp_close] = true
+        end
+
         params.on "--script SCRIPT", String, "Select scripts to use" do |script|
+          @script_used = false
           if script.include? ","
             scripts = script.split ","
             scripts.each do |script_control|
               if @scripts.include? script_control
                 @used_scripts.append script_control
+                @script_used = true
               end
             end
           else
             if @scripts.include? script
               @parameters[:script] = [script]
               @used_scripts.append script
+              @script_used = true
             end
           end
+        end
+
+        params.on "--reason", String, "Add closed ports output to output." do
+          @parameters[:show_reason] = true
         end
 
         params.on "--script-args SCRIPT_ARGS", String, "Define args to use on script attack" do |script_args|
@@ -193,10 +204,6 @@ Github: https://github.com/thebunjo/BunjoNET
     end
   end
 
-  def save_output
-
-  end
-
   def valid_ports? ports
     valid_negative = ports.all? { |port| port.to_i >= 0 }
     valid_range = ports.all? { |port| port.to_i <= 65535 }
@@ -211,6 +218,10 @@ Github: https://github.com/thebunjo/BunjoNET
 
     valid_negative
     valid_range
+  end
+
+  def save_output
+
   end
 
   def print_scripts
@@ -268,14 +279,18 @@ HELP STAGE
       --host HOST: Define the target host
 
     PORT SCANNING
-      --tcp: TCP PORTS: Ports for TCP scanning      
-      --tcp all: Scan all tcp ports
-      --exclude-tcp PORTS: TCP ports to skip on scan
+      TCP
+        --tcp: TCP PORTS: Ports for TCP scanning      
+        --tcp all: Scan all tcp ports
+        --exclude-tcp PORTS: TCP ports to skip on scan
+        --show-tcp-close: Show closed tcp ports
       
-      --udp: UDP PORTS: Port for UDP scanning
-      --udp all: Scan all udp ports
-      --exclude-udp PORTS: UDP ports to skip on scan
-
+      UDP
+        --udp: UDP PORTS: Port for UDP scanning
+        --udp all: Scan all udp ports
+        --exclude-udp PORTS: UDP ports to skip on scan
+        --show-udp-close: Show closed udp ports
+       
       --banner: Use this for get the banners of the ports
       --exclude-banner TCP_PORT: Do not get banners for defined ports 
 
@@ -318,11 +333,14 @@ HELP STAGE
     $stdout.puts "| Timeout: #{@parameters[:timeout]}".colorize :light_white
     $stdout.puts "|".colorize :light_white
 
+    $stdout.puts "| Script Engine: #{@used_scripts.join ","}".colorize :light_white if @script_used
+    $stdout.puts "|".colorize :light_white if @script_used
+
     $stdout.puts "| Ports:".colorize :light_white
 
-    if @parameters[:tcp_ports].is_a? Array
+    if @parameters[:tcp_ports].is_a? Array and @parameters[:tcp_ports]
       $stdout.puts "|\tTCP: #{@parameters[:tcp_ports].join(", ")}".colorize :light_white
-    elsif @parameters[:tcp_ports].is_a? Range
+    elsif @parameters[:tcp_ports].is_a? Range and @parameters[:tcp_ports]
       $stdout.puts "|\tTCP Range: #{@parameters[:tcp_ports]}"
                      .colorize :light_white
     end
@@ -335,7 +353,7 @@ HELP STAGE
                      .colorize :light_white unless @parameters[:exclude_tcp].nil?
     end
 
-    $stdout.puts "|".colorize :light_white
+    $stdout.puts "|".colorize :light_white unless @parameters[:udp_ports].nil?
 
     if @parameters[:udp_ports].is_a? Array
       $stdout.puts "|\tUDP: #{@parameters[:udp_ports].join(", ")}".colorize :light_white
@@ -358,7 +376,7 @@ HELP STAGE
   def import_scanner_tcp
     @tcp_scanner_file = File.join $current_directory, 'utils', 'tcp_scanner', 'tcp_scan.rb'
     require @tcp_scanner_file
-    @tcp_scanner = BunjoScanTCP.new @parameters[:host], @parameters[:timeout]
+    @tcp_scanner = BunjoScanTCP.new @parameters[:host], @parameters[:timeout], @parameters[:show_tcp_close], @parameters[:show_reason]
   end
 
   def import_scanner_udp
@@ -434,6 +452,7 @@ HELP STAGE
           exit 0
 
         when @parameters[:tcp_ports] && @parameters[:udp_ports]
+          display
           $stdout.puts "| PORT STATUS".colorize :light_white
 
           time_now = Time.now
@@ -444,6 +463,7 @@ HELP STAGE
           $stdout.puts "|".colorize :light_white
           $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
         when @parameters[:tcp_ports]
+          display
           case
 
           when @parameters[:script]
@@ -467,6 +487,7 @@ HELP STAGE
             $stdout.puts "| THE PASSING TIME (with timeout): #{Time.now - time_now}".colorize :light_white
           end
         when @parameters[:udp_ports]
+          display
           $stdout.puts "| PORT STATUS".colorize :light_white
 
           time_now = Time.now
@@ -487,5 +508,4 @@ HELP STAGE
   end
 
   port_scanner = BunjoNET.new
-  port_scanner.display
   port_scanner.start
